@@ -1,18 +1,225 @@
 #include <Arduino.h>
+#include <Wire.h>
+#include <Preferences.h>
 
-// put function declarations here:
-int myFunction(int, int);
+#include "config.h"
+#include "comms/packets.h"
+#include "comms/espnow.h"
+#include "routing/node_state.h"
+#include "sensors/radar.h"
+#include "sensors/temperature.h"
+#include "sensors/mq.h"
+#include "sensors/flame.h"
+#include "sensors/tof.h"
+#include "display/oled.h"
+#include "display/leds.h"
 
-void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+// ─── Global state ─────────────────────────────────────────────────────────────
+
+static Preferences prefs;
+static NodeState *node = nullptr;
+static bool nodeAlive = true;
+
+// ─── Button state ─────────────────────────────────────────────────────────────
+
+static bool lastAliveBtn = false;
+static bool lastBlockedBtn = false;
+static bool btnBlocked = false;
+
+// ─── ESP-NOW receive callback ─────────────────────────────────────────────────
+
+void onPacketReceived(const uint8_t *data, int len, uint32_t now)
+{
+  // FIX: dispatch on FIRST byte (type), not last
+  // FIX: check minimum length before touching data
+  if (len < 2)
+    return;
+
+  uint8_t version = data[0];
+  uint8_t type = data[1];
+
+  if (version != PACKET_VERSION)
+    return; // ignore foreign/stale packets
+
+  if (type == 0 && len >= (int)sizeof(HelloPacket))
+  {
+    HelloPacket pkt;
+    memcpy(&pkt, data, sizeof(HelloPacket));
+    node->receiveHello(pkt);
+  }
+  else if (type == 1 && len >= (int)sizeof(NodePacket))
+  {
+    NodePacket pkt;
+    memcpy(&pkt, data, sizeof(NodePacket));
+    node->receivePacket(pkt, now);
+  }
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
+// ─── Exit toggle ──────────────────────────────────────────────────────────────
+
+void checkExitToggle(uint32_t now)
+{
+  static bool lastState = false;
+  static uint32_t lastMs = 0;
+
+  bool pressed = (digitalRead(BTN_EXIT_PIN) == HIGH);
+
+  if (pressed && !lastState && (now - lastMs) > 200)
+  {
+    node->is_exit = !node->is_exit;
+    node->best_exit_cost = node->is_exit ? node->local_cost : INF_COST;
+    node->direction = node->is_exit ? DIRECTION_SELF : DIRECTION_NONE;
+    prefs.putBool("is_exit", node->is_exit);
+    lastMs = now;
+  }
+  lastState = pressed;
 }
 
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+// ─── Alive toggle ─────────────────────────────────────────────────────────────
+
+void checkAliveToggle(uint32_t now)
+{
+  static uint32_t lastMs = 0;
+
+  bool pressed = (digitalRead(BTN_ALIVE_PIN) == HIGH);
+
+  if (pressed && !lastAliveBtn && (now - lastMs) > 200)
+  {
+    nodeAlive = !nodeAlive;
+
+    if (nodeAlive)
+    {
+      node->sensors.alive = true;
+      node->mood = Mood::STBY;
+      node->best_exit_cost = INF_COST;
+      node->direction = DIRECTION_NONE;
+      node->sos_active = false;
+      node->still_timer = 0.0f;
+      Serial.println("Node online — mood reset.");
+    }
+    else
+    {
+      node->sensors.alive = false;
+      Serial.println("Node offline.");
+    }
+
+    lastMs = now;
+  }
+  lastAliveBtn = pressed;
+}
+
+// ─── Blocked toggle ───────────────────────────────────────────────────────────
+
+void checkBlockedToggle(uint32_t now)
+{
+  static uint32_t lastMs = 0;
+
+  bool pressed = (digitalRead(BTN_BLOCKED_PIN) == HIGH);
+
+  if (pressed && !lastBlockedBtn && (now - lastMs) > 200)
+  {
+    btnBlocked = !btnBlocked;
+    lastMs = now;
+  }
+  lastBlockedBtn = pressed;
+}
+
+// ─── Setup ───────────────────────────────────────────────────────────────────
+
+void setup()
+{
+  Serial.begin(115200);
+
+  // I2C — shared by ToF and OLED
+  Wire.begin(TOF_SDA_PIN, TOF_SCL_PIN);
+
+  // FIX: buttons first, LEDs second — no pin overlap, but ordering is explicit
+  // Button pins
+  pinMode(BTN_ALIVE_PIN, INPUT_PULLDOWN);
+  pinMode(BTN_BLOCKED_PIN, INPUT_PULLDOWN);
+  pinMode(BTN_EXIT_PIN, INPUT_PULLDOWN);
+
+  // NVS
+  prefs.begin("hecate", false);
+  bool is_exit = prefs.getBool("is_exit", false);
+
+  // Node
+  node = new NodeState(NODE_ID, FLOOR_ID, NODE_X, NODE_Y, is_exit);
+
+  // Sensors — MQ blocks ~30s here
+  mqInit();
+  flameInit();
+  tofInit();
+  radarInit(RADAR_RX_PIN, RADAR_TX_PIN);
+  tempInit(TEMP_PIN);
+
+  // FIX: LEDs init after buttons — ledsInit() only touches LED pins
+  ledsInit();
+  oledInit();
+
+  // Comms
+  espnowInit(onPacketReceived);
+
+  // Announce
+  HelloPacket hello = node->buildHello();
+  espnowSendHello((uint8_t *)&hello, sizeof(HelloPacket));
+
+  Serial.println("Hecate node ready.");
+}
+
+// ─── Loop ────────────────────────────────────────────────────────────────────
+
+void loop()
+{
+  uint32_t now = millis();
+
+  static uint32_t lastTick = 0;
+  float dt = (now - lastTick) / 1000.0f;
+  lastTick = now;
+
+  // ── 0. Buttons ────────────────────────────────────────────────────────────
+  checkAliveToggle(now);
+  checkBlockedToggle(now);
+  checkExitToggle(now);
+
+  // ── Offline path ──────────────────────────────────────────────────────────
+  if (!nodeAlive)
+  {
+    ledsUpdate(node->mood, node->sos_active);
+    oledUpdate(*node);
+    return;
+  }
+
+  // ── 1. Sensors ────────────────────────────────────────────────────────────
+  radarRead();
+
+  node->sensors.heat_norm = tempGetHeatNorm();
+  node->sensors.delta_temp_norm = tempGetDeltaNorm();
+  node->sensors.pressure_norm = radarGetPressure();
+  node->sensors.still_norm = radarGetStillNorm();
+  node->sensors.smoke_norm = mqGetSmokeNorm();
+  node->sensors.air_norm = mqGetAirNorm();
+  node->sensors.flame_norm = flameGetNorm();
+
+  // Hardware blocked OR button blocked
+  node->sensors.blocked = btnBlocked || flameGetDigital() || tofForwardBlocked();
+
+  // ── 2. Algorithm tick ─────────────────────────────────────────────────────
+  node->updateDerivedSensors();
+  node->updateLocalCost();
+  node->updateMood();
+  node->updateNeighbors(now);
+  node->updateRouting();
+  node->updateRescue(dt);
+
+  // ── 3. Broadcast ──────────────────────────────────────────────────────────
+  if (node->broadcastDue(now))
+  {
+    NodePacket pkt = node->buildPacket(now);
+    espnowBroadcast((uint8_t *)&pkt, sizeof(NodePacket));
+  }
+
+  // ── 4. Outputs ────────────────────────────────────────────────────────────
+  ledsUpdate(node->mood, node->sos_active);
+  oledUpdate(*node);
 }

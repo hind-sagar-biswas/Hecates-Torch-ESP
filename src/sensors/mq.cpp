@@ -13,19 +13,17 @@ void mqInit()
 {
     pinMode(MQ2_PIN, INPUT);
     pinMode(MQ135_PIN, INPUT);
-
-    // Warm-up: heater runs, we just wait. No reads needed.
     delay(WARMUP_MS);
 }
 
 float mqGetSmokeNorm()
 {
-    int raw = analogRead(MQ2_PIN); // 0–4095 on ESP32
-    return constrain(raw / MQ2_MAX, 0.0f, 1.0f);
+    int raw = analogRead(MQ2_PIN);
+    return constrain((float)raw / MQ2_MAX, 0.0f, 1.0f);
 }
 
 float mqGetAirNorm()
 {
     int raw = analogRead(MQ135_PIN);
-    return constrain(raw / MQ135_MAX, 0.0f, 1.0f);
+    return constrain((float)raw / MQ135_MAX, 0.0f, 1.0f);
 }

@@ -31,10 +31,9 @@ void espnowInit(void (*onPacketReceived)(const uint8_t *data, int len, uint32_t 
 
     if (esp_now_init() != ESP_OK)
     {
-        // Fatal — without comms the node is isolated.
-        // In production you'd flash an error LED. For now, halt.
-        while (true)
-            delay(1000);
+        Serial.println("ESP-NOW init failed — restarting.");
+        delay(1000);
+        ESP.restart(); // cleaner than infinite spin
     }
 
     esp_now_register_recv_cb(_onReceive);
@@ -44,7 +43,14 @@ void espnowInit(void (*onPacketReceived)(const uint8_t *data, int len, uint32_t 
     memcpy(peer.peer_addr, BROADCAST_ADDR, 6);
     peer.channel = 0; // 0 = current channel
     peer.encrypt = false;
-    esp_now_add_peer(&peer);
+
+    // FIX: check esp_now_add_peer return value
+    if (esp_now_add_peer(&peer) != ESP_OK)
+    {
+        Serial.println("ESP-NOW add peer failed — restarting.");
+        delay(1000);
+        ESP.restart();
+    }
 }
 
 void espnowBroadcast(const uint8_t *data, size_t len)

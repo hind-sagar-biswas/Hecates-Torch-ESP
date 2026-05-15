@@ -26,6 +26,7 @@
 #define ARROW_LEN 18 // pixels from center to tip
 
 static Adafruit_SSD1306 display(SCREEN_W, SCREEN_H, &Wire, -1);
+static bool oled_ok = false;
 
 // ─── Direction helpers ───────────────────────────────────────────────────────
 
@@ -159,10 +160,10 @@ static void drawArrow(Dir8 d)
 
 void oledInit()
 {
-    // Wire.begin() already called in main setup()
-    if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR))
+    oled_ok = display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR);
+    if (!oled_ok)
     {
-        // No display — non-fatal, node still works
+        Serial.println("OLED init failed — display disabled.");
         return;
     }
     display.clearDisplay();
@@ -173,6 +174,8 @@ void oledInit()
 
 void oledUpdate(const NodeState &node)
 {
+    if (!oled_ok)
+        return;
     display.clearDisplay();
 
     // ── Divider line ─────────────────────────────────────────────────────────

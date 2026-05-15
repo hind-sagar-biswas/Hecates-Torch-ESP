@@ -4,6 +4,8 @@
 #define NODE_ID 1
 #define FLOOR_ID 0
 #define IS_EXIT false
+#define NODE_X 2.0f
+#define NODE_Y 3.0f
 
 // ─── Pin Definitions ──────────────────────────────────────────────────────────
 
@@ -38,14 +40,14 @@
 #define LED_BLUE_PIN 5
 
 // Demo knobs (potentiometers)
-#define KNOB_PRESSURE_PIN 36
-#define KNOB_FIRE_PIN 39
-#define KNOB_AIR_PIN 34 // shared with MQ2 on Node 0 (sim node)
+// #define KNOB_PRESSURE_PIN 36
+// #define KNOB_FIRE_PIN 39
+// #define KNOB_AIR_PIN 34 // shared with MQ2 on Node 0 (sim node)
 
 // Demo buttons
-#define BTN_ALIVE_PIN 18
-#define BTN_BLOCKED_PIN 19
-#define BTN_EXIT_PIN 23 // button 3 — toggle exit node status
+#define BTN_ALIVE_PIN 13
+#define BTN_BLOCKED_PIN 14
+#define BTN_EXIT_PIN 12 // button 3 — toggle exit node status
 
 // ─── Algorithm Constants ──────────────────────────────────────────────────────
 #define BASE_DISTANCE 1.0f
@@ -65,14 +67,14 @@
 #define D_MIN 0.5f  // meters — blocked if forward < this
 #define D_SAFE 0.3f // meters — hole if ground > this
 
-#define MQ2_MAX 1000.0f
-#define MQ135_MAX 1000.0f
+#define MQ2_MAX 4095.0f
+#define MQ135_MAX 4095.0f
 #define HEAT_BASE 40.0f
 #define HEAT_RANGE 15.0f
 
-#define FLAME_ALERT_THR 500
-#define SMOKE_ALERT_THR 700
-#define AIR_ALERT_THR 700
+#define FLAME_ALERT_THR 0.5f
+#define SMOKE_ALERT_THR 0.7f
+#define AIR_ALERT_THR 0.7f
 #define PRESSURE_WARN_THR 0.6f
 #define SMOKE_WARN_THR 0.5f
 #define AIR_WARN_THR 0.5f
