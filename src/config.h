@@ -54,6 +54,14 @@
 #define WEIGHT_ETA 2.5f   // smoke
 #define WEIGHT_KAPPA 1.5f // heat
 
+// Fire fusion weights (sum to 1 for normalized FireValue)
+#define W1 0.5f // flame analog contribution
+#define W2 0.3f // temperature rate-of-rise contribution
+#define W3 0.2f // smoke confirmation contribution
+// Air quality weights
+#define BETA_SMOKE 0.6f // mq2 weight in H_air (higher — immediate visibility)
+#define ETA_TOX 0.4f    // mq135 weight in H_air (lower — longer-term risk)
+
 #define D_MIN 0.5f  // meters — blocked if forward < this
 #define D_SAFE 0.3f // meters — hole if ground > this
 

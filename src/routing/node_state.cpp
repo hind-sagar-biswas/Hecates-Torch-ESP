@@ -3,17 +3,34 @@
 
 NodeState::NodeState(uint8_t id, uint8_t floor, float px, float py, bool exit)
     : node_id(id), floor_id(floor), x(px), y(py), is_exit(exit),
-      mood(Mood::STBY), local_cost(BASE_DISTANCE),
+      mood(Mood::STBY),
+      local_cost(BASE_DISTANCE),
       best_exit_cost(exit ? BASE_DISTANCE : INF_COST),
       direction(exit ? DIRECTION_SELF : DIRECTION_NONE),
       sos_active(false), sos_relay_count(0),
-      still_timer(0), last_broadcast(0)
+      still_timer(0), last_broadcast(0),
+      cached_fire_value(0.0f), cached_h_air(0.0f)
 {
-    sensors = {0, 0, 0, 0, 0, 0, false, true};
+    // SensorReadings uses in-class default initializers — no manual zeroing needed
     memset(sos_relays, 0, sizeof(sos_relays));
 }
 
-// TODO: UPDATE THE COST CALCULATION TO MATCH THE PAPER — CURRENTLY SIMPLIFIED FOR DEMO PURPOSES
+// ─── Derived sensor fusion ────────────────────────────────────────────────────
+// Called once per tick before updateLocalCost() and updateMood()
+// Prevents computing fire_value and h_air twice per tick
+
+void NodeState::updateDerivedSensors()
+{
+    // Fused fire hazard — flame analog + rate of temp rise + smoke confirmation
+    cached_fire_value = constrain(W1 * sensors.flame_norm + W2 * sensors.delta_temp_norm + W3 * sensors.smoke_norm, 0.0f, 1.0f);
+
+    // Weighted air quality index — smoke weighted higher (immediate visibility)
+    // Normalized so result stays in [0,1]
+    cached_h_air = (ETA_TOX * sensors.air_norm + BETA_SMOKE * sensors.smoke_norm) / (ETA_TOX + BETA_SMOKE);
+}
+
+// ─── Local cost ───────────────────────────────────────────────────────────────
+
 void NodeState::updateLocalCost()
 {
     if (!sensors.alive || sensors.blocked)
@@ -21,8 +38,11 @@ void NodeState::updateLocalCost()
         local_cost = INF_COST;
         return;
     }
-    local_cost = BASE_DISTANCE + WEIGHT_ALPHA * sensors.pressure_norm + WEIGHT_BETA * sensors.flame_norm + WEIGHT_ETA * sensors.smoke_norm + WEIGHT_KAPPA * sensors.heat_norm;
+
+    local_cost = BASE_DISTANCE + WEIGHT_ALPHA * sensors.pressure_norm + WEIGHT_BETA * cached_fire_value + WEIGHT_ETA * cached_h_air + WEIGHT_KAPPA * sensors.heat_norm;
 }
+
+// ─── Mood elevation ───────────────────────────────────────────────────────────
 
 void NodeState::updateMood()
 {
@@ -32,17 +52,13 @@ void NodeState::updateMood()
         return;
     }
 
-    if (sensors.flame_norm > (FLAME_ALERT_THR / 1000.0f) ||
-        sensors.smoke_norm > (SMOKE_ALERT_THR / MQ2_MAX) ||
-        sensors.air_norm > (AIR_ALERT_THR / MQ135_MAX))
+    if (cached_fire_value > FLAME_ALERT_THR || cached_h_air > SMOKE_ALERT_THR)
     {
         mood = Mood::ALERT;
         return;
     }
 
-    if (sensors.pressure_norm > PRESSURE_WARN_THR ||
-        sensors.smoke_norm > SMOKE_WARN_THR ||
-        sensors.air_norm > AIR_WARN_THR)
+    if (sensors.pressure_norm > PRESSURE_WARN_THR || cached_h_air > SMOKE_WARN_THR || sensors.air_norm > AIR_WARN_THR)
     {
         mood = Mood::WARN;
         return;
@@ -51,10 +67,14 @@ void NodeState::updateMood()
     mood = Mood::STBY;
 }
 
+// ─── Neighbor staleness ───────────────────────────────────────────────────────
+
 void NodeState::updateNeighbors(uint32_t now)
 {
     neighbors.checkStaleness(now);
 }
+
+// ─── Bellman-Ford routing step ────────────────────────────────────────────────
 
 void NodeState::updateRouting()
 {
@@ -71,8 +91,7 @@ void NodeState::updateRouting()
     for (uint8_t i = 0; i < neighbors.count; i++)
     {
         NeighborEntry &n = neighbors.entries[i];
-        if (n.status == NeighborStatus::N_SIG ||
-            n.status == NeighborStatus::EVAC)
+        if (n.status == NeighborStatus::N_SIG || n.status == NeighborStatus::EVAC)
             continue;
 
         float candidate = local_cost + n.best_exit_cost;
@@ -92,6 +111,8 @@ void NodeState::updateRouting()
     }
 }
 
+// ─── RESCUE / SOS detection ───────────────────────────────────────────────────
+
 void NodeState::updateRescue(float dt)
 {
     bool trapped = sensors.still_norm > 0.7f && sensors.pressure_norm < 0.2f;
@@ -99,7 +120,7 @@ void NodeState::updateRescue(float dt)
     if (trapped)
     {
         still_timer += dt;
-        // T_CONFIRM varies by mood — simplified for firmware
+
         float confirm = (mood == Mood::EVAC) ? 3.0f : (mood == Mood::ALERT) ? 5.0f
                                                   : (mood == Mood::WARN)    ? 15.0f
                                                                             : 20.0f;
@@ -114,6 +135,8 @@ void NodeState::updateRescue(float dt)
         sos_active = false;
     }
 }
+
+// ─── Packet building ──────────────────────────────────────────────────────────
 
 NodePacket NodeState::buildPacket(uint32_t now)
 {
@@ -136,12 +159,13 @@ void NodeState::receivePacket(const NodePacket &pkt, uint32_t now)
         return;
     neighbors.updateFromPacket(pkt, now);
 
-    // SOS relay
     if (pkt.sos_flag && pkt.sos_origin_id != node_id)
     {
         addSosRelay(pkt.sos_origin_id);
     }
 }
+
+// ─── HELLO ────────────────────────────────────────────────────────────────────
 
 HelloPacket NodeState::buildHello()
 {
@@ -159,15 +183,16 @@ void NodeState::receiveHello(const HelloPacket &pkt)
     if (pkt.node_id == node_id)
         return;
 
-    // Distance gate — NEIGHBOR_RANGE check
     float dx = x - pkt.x;
     float dy = y - pkt.y;
     float dist = sqrtf(dx * dx + dy * dy);
     if (dist > 3.5f)
-        return; // NEIGHBOR_RANGE
+        return; // NEIGHBOR_RANGE — matches values.js NEIGHBOR_RANGE
 
     neighbors.addFromHello(pkt);
 }
+
+// ─── Timing ───────────────────────────────────────────────────────────────────
 
 uint32_t NodeState::broadcastInterval() const
 {
@@ -188,6 +213,8 @@ bool NodeState::broadcastDue(uint32_t now) const
 {
     return (now - last_broadcast) >= broadcastInterval();
 }
+
+// ─── SOS relay helpers ────────────────────────────────────────────────────────
 
 bool NodeState::hasSosRelay(uint8_t origin_id) const
 {
