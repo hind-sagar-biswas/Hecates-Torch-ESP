@@ -28,14 +28,14 @@
 #define MQ135_PIN 35
 
 // Flame Sensor
-#define FLAME_ANA_PIN 32
-#define FLAME_DIG_PIN 33
+#define FLAME_ANA_PIN 26
+#define FLAME_DIG_PIN 27
 
 // LEDs
-#define LED_GREEN_PIN 25
-#define LED_YELLOW_PIN 26
-#define LED_RED_PIN 27
-#define LED_BLUE_PIN 14
+#define LED_GREEN_PIN 18
+#define LED_YELLOW_PIN 19
+#define LED_RED_PIN 23
+#define LED_BLUE_PIN 5
 
 // Demo knobs (potentiometers)
 #define KNOB_PRESSURE_PIN 36
