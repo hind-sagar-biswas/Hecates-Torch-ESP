@@ -39,6 +39,11 @@ public:
     uint8_t sos_relay_count;
     float still_timer;
 
+    float p_trapped = 0.0f;
+    float p_history[5] = {0};
+    uint8_t p_idx = 0;
+    uint8_t sos_reason = 0; // 0=trapped, 1=fire_blocked, 2=toxic
+
     SensorReadings sensors;
     NeighborTable neighbors;
     uint32_t last_broadcast;

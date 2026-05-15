@@ -112,27 +112,89 @@ void NodeState::updateRouting()
 }
 
 // ─── RESCUE / SOS detection ───────────────────────────────────────────────────
+// ─── Internal helpers ────────────────────────────────────────────────────────
 
+static float smoothProb(float *history, uint8_t &idx, float newVal)
+{
+    history[idx % 5] = newVal;
+    idx++;
+    float sum = 0;
+    for (int i = 0; i < 5; i++)
+        sum += history[i];
+    return sum / 5.0f;
+}
+
+// ─── Main rescue update ──────────────────────────────────────────────────────
 void NodeState::updateRescue(float dt)
 {
-    bool trapped = sensors.still_norm > 0.7f && sensors.pressure_norm < 0.2f;
 
-    if (trapped)
+    bool trapped_signature =
+        sensors.still_norm > 0.35f &&
+        sensors.pressure_norm < 0.20f &&
+        sensors.still_norm > (sensors.pressure_norm * 1.5f);
+
+    if (trapped_signature)
     {
         still_timer += dt;
 
-        float confirm = (mood == Mood::EVAC) ? 3.0f : (mood == Mood::ALERT) ? 5.0f
-                                                  : (mood == Mood::WARN)    ? 15.0f
-                                                                            : 20.0f;
-        if (still_timer > confirm && sensors.still_norm > 0.7f)
+        // Human presence probability — radar only
+        // These are the only signals reliable through smoke and fire
+        float p_still = sensors.still_norm;
+        float p_isolated = 1.0f - constrain(sensors.pressure_norm * 3.0f, 0.0f, 1.0f);
+
+        float p_raw;
+        bool fire_confirmed = cached_fire_value > 0.5f;
+
+        if (fire_confirmed)
+        {
+            // Fire: only radar trusted, thermal evidence is meaningless
+            p_raw = (p_still * 0.70f) +
+                    (p_isolated * 0.30f);
+        }
+        else
+        {
+            // No fire: weak body heat signal from DS18B20 is usable
+            float p_body_heat = 0.0f;
+            if (sensors.heat_norm > 0.0f && sensors.heat_norm < 0.25f)
+                p_body_heat = sensors.heat_norm / 0.25f;
+
+            p_raw = (p_still * 0.60f) + (p_isolated * 0.25f) + (p_body_heat * 0.15f);
+        }
+
+        p_trapped = smoothProb(p_history, p_idx, p_raw);
+
+        // Confirm time: dangerous environment shortens wait
+        // not because we're more certain, but because we can't afford to wait
+        float confirm =
+            (mood == Mood::EVAC) ? 3.0f : (mood == Mood::ALERT) ? 5.0f
+                                      : (mood == Mood::WARN)    ? 15.0f
+                                                                : 20.0f;
+
+        if (still_timer > confirm && p_trapped > 0.65f)
         {
             sos_active = true;
+
+            // Reason tells responders what they're walking into
+            // not who or how many
+            if (cached_fire_value > 0.7f)
+                sos_reason = 1; // FIRE_BLOCKED
+            else if (sensors.air_norm > 0.6f && sensors.smoke_norm > 0.5f)
+                sos_reason = 2; // TOXIC
+            else
+                sos_reason = 0; // TRAPPED
         }
     }
     else
     {
-        still_timer = 0;
-        sos_active = false;
+        still_timer = 0.0f;
+        p_trapped = smoothProb(p_history, p_idx, 0.0f);
+
+        // Hysteresis — don't kill SOS on a single missed reading
+        if (p_trapped < 0.20f)
+        {
+            sos_active = false;
+            sos_reason = 0;
+        }
     }
 }
 
