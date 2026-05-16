@@ -1,5 +1,6 @@
 #include "espnow.h"
 #include "comms/packets.h"
+#include <esp_wifi.h>
 #include <esp_now.h>
 #include <WiFi.h>
 
@@ -28,6 +29,7 @@ void espnowInit(void (*onPacketReceived)(const uint8_t *data, int len, uint32_t 
 
     WiFi.mode(WIFI_STA);
     WiFi.disconnect(); // ensure no AP association
+    esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
 
     if (esp_now_init() != ESP_OK)
     {
@@ -41,7 +43,7 @@ void espnowInit(void (*onPacketReceived)(const uint8_t *data, int len, uint32_t 
     // Register broadcast peer — required before sending to that address
     esp_now_peer_info_t peer = {};
     memcpy(peer.peer_addr, BROADCAST_ADDR, 6);
-    peer.channel = 0; // 0 = current channel
+    peer.channel = 1; // 0 = current channel
     peer.encrypt = false;
 
     // FIX: check esp_now_add_peer return value

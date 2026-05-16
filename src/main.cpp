@@ -222,4 +222,17 @@ void loop()
   // ── 4. Outputs ────────────────────────────────────────────────────────────
   ledsUpdate(node->mood, node->sos_active);
   oledUpdate(*node);
+
+  static uint32_t lastPrint = 0;
+  if (now - lastPrint > 2000)
+  {
+    Serial.printf("[N%d] mood=%d cost=%.2f dir=%d sos=%d p=%.2f\n",
+                  node->node_id,
+                  (int)node->mood,
+                  node->best_exit_cost,
+                  node->direction,
+                  node->sos_active,
+                  node->p_trapped);
+    lastPrint = now;
+  }
 }

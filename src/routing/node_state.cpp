@@ -13,6 +13,7 @@ NodeState::NodeState(uint8_t id, uint8_t floor, float px, float py, bool exit)
 {
     // SensorReadings uses in-class default initializers — no manual zeroing needed
     memset(sos_relays, 0, sizeof(sos_relays));
+    last_broadcast = millis();
 }
 
 // ─── Derived sensor fusion ────────────────────────────────────────────────────
@@ -128,10 +129,7 @@ static float smoothProb(float *history, uint8_t &idx, float newVal)
 void NodeState::updateRescue(float dt)
 {
 
-    bool trapped_signature =
-        sensors.still_norm > 0.35f &&
-        sensors.pressure_norm < 0.20f &&
-        sensors.still_norm > (sensors.pressure_norm * 1.5f);
+    bool trapped_signature = sensors.still_norm > 0.35f && sensors.pressure_norm < 0.20f && sensors.still_norm > (sensors.pressure_norm * 1.5f);
 
     if (trapped_signature)
     {
