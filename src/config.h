@@ -47,14 +47,14 @@
 #define LED_RED_PIN 23
 #define LED_BLUE_PIN 5
 
-// Demo knobs (potentiometers)
-// #define KNOB_PRESSURE_PIN 36
-// #define KNOB_FIRE_PIN 39
-// #define KNOB_AIR_PIN 34 // shared with MQ2 on Node 0 (sim node)
+// Demo knobs (potentiometers) - since this is in demo, it won't interfere with sensors
+#define KNOB_PRESSURE_PIN 32
+#define KNOB_FIRE_PIN 33
+#define KNOB_AIR_PIN 35
 
 // Demo buttons
 #define BTN_ALIVE_PIN 13
-#define BTN_BLOCKED_PIN 14
+#define BTN_BLOCKED_PIN 34  // since this is in demo, it won't interfere with MQ2 (demo does not have sensors)
 #define BTN_EXIT_PIN 12 // button 3 — toggle exit node status
 
 // ─── Algorithm Constants ──────────────────────────────────────────────────────
