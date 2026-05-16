@@ -34,6 +34,11 @@ void NodeState::updateDerivedSensors()
 
 void NodeState::updateLocalCost()
 {
+    // Output sensors values
+    // Serial.printf("Node %d sensors — Pressure: %.2f, Fire: %.2f, H_air: %.2f, Heat: %.2f\n",
+    //               node_id, sensors.pressure_norm, cached_fire_value, cached_h_air, sensors.heat_norm);
+    // Output Blockage status
+    // Serial.printf("Node %d blockage status: %s\n", node_id, sensors.blocked ? "BLOCKED" : "CLEAR");
     if (!sensors.alive || sensors.blocked)
     {
         local_cost = INF_COST;

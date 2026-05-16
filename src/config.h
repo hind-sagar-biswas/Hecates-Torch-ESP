@@ -3,12 +3,12 @@
 // ─── Node Identity ────────────────────────────────────────────────────────────
 #define NODE_ID 1
 #define FLOOR_ID 0
-#define IS_EXIT false
+#define IS_EXIT true
 #define NODE_X 2.0f
 #define NODE_Y 3.0f
 
 // ─── Boot phase timing ────────────────────────────────────────────────────────
-#define HELLO_PHASE_DEMO_MS 30000       // 30s for demo
+#define HELLO_PHASE_DEMO_MS 3000       // 30s for demo
 #define HELLO_PHASE_PROD_MS 300000      // 5min for production
 #define HELLO_BROADCAST_INTERVAL_MS 500 // broadcast HELLO every 500ms during phase
 
@@ -38,7 +38,7 @@
 #define MQ135_PIN 35
 
 // Flame Sensor
-#define FLAME_ANA_PIN 26
+#define FLAME_ANA_PIN 33
 #define FLAME_DIG_PIN 27
 
 // LEDs
@@ -55,7 +55,7 @@
 // Demo buttons
 #define BTN_ALIVE_PIN 13
 #define BTN_BLOCKED_PIN 34  // since this is in demo, it won't interfere with MQ2 (demo does not have sensors)
-#define BTN_EXIT_PIN 12 // button 3 — toggle exit node status
+#define BTN_EXIT_PIN 14 // button 3 — toggle exit node status
 
 // ─── Algorithm Constants ──────────────────────────────────────────────────────
 #define BASE_DISTANCE 1.0f
@@ -72,7 +72,7 @@
 #define BETA_SMOKE 0.6f // mq2 weight in H_air (higher — immediate visibility)
 #define ETA_TOX 0.4f    // mq135 weight in H_air (lower — longer-term risk)
 
-#define D_MIN 0.5f  // meters — blocked if forward < this
+#define D_MIN 0.05f  // meters — blocked if forward < this
 #define D_SAFE 0.3f // meters — hole if ground > this
 
 #define MQ2_MAX 4095.0f

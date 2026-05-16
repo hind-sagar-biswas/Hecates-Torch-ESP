@@ -152,13 +152,13 @@ void setup()
 
   // FIX: buttons first, LEDs second — no pin overlap, but ordering is explicit
   // Button pins
-  pinMode(BTN_ALIVE_PIN, INPUT_PULLDOWN);
-  pinMode(BTN_BLOCKED_PIN, INPUT_PULLDOWN);
-  pinMode(BTN_EXIT_PIN, INPUT_PULLDOWN);
+  // pinMode(BTN_ALIVE_PIN, INPUT_PULLDOWN);
+  // pinMode(BTN_BLOCKED_PIN, INPUT_PULLDOWN);
+  // pinMode(BTN_EXIT_PIN, INPUT_PULLDOWN);
 
   // NVS
   prefs.begin("hecate", false);
-  bool is_exit = prefs.getBool("is_exit", false);
+  bool is_exit = prefs.getBool("is_exit", IS_EXIT); // default to config value if not set
 
   // Node
   node = new NodeState(NODE_ID, FLOOR_ID, NODE_X, NODE_Y, is_exit);
@@ -225,9 +225,9 @@ void loop()
   // ── OPERATIONAL phase ─────────────────────────────────────────────────────
 
   // ── 0. Buttons ────────────────────────────────────────────────────────────
-  checkAliveToggle(now);
-  checkBlockedToggle(now);
-  checkExitToggle(now);
+  // checkAliveToggle(now);
+  // checkBlockedToggle(now);
+  // checkExitToggle(now);
 
   // ── Offline path ──────────────────────────────────────────────────────────
   if (!nodeAlive)

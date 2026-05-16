@@ -25,5 +25,5 @@ float flameGetNorm()
 
 bool flameGetDigital()
 {
-    return digitalRead(FLAME_DIG_PIN) == LOW; // active low
+    return digitalRead(FLAME_DIG_PIN) == HIGH; // active low
 }
