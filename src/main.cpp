@@ -14,11 +14,21 @@
 #include "display/oled.h"
 #include "display/leds.h"
 
+enum class BootPhase
+{
+  HELLO,
+  OPERATIONAL
+};
+
 // ─── Global state ─────────────────────────────────────────────────────────────
 
 static Preferences prefs;
 static NodeState *node = nullptr;
 static bool nodeAlive = true;
+
+static BootPhase bootPhase = BootPhase::HELLO;
+static uint32_t helloPhaseStart = 0;
+static uint32_t lastHelloBroadcast = 0;
 
 // ─── Button state ─────────────────────────────────────────────────────────────
 
@@ -39,19 +49,26 @@ void onPacketReceived(const uint8_t *data, int len, uint32_t now)
   uint8_t type = data[1];
 
   if (version != PACKET_VERSION)
-    return; // ignore foreign/stale packets
+    return;
 
   if (type == 0 && len >= (int)sizeof(HelloPacket))
   {
+    // Accept HELLO packets in BOTH phases —
+    // a node that reboots mid-session needs to re-announce itself
     HelloPacket pkt;
     memcpy(&pkt, data, sizeof(HelloPacket));
-    node->receiveHello(pkt);
+    node->receiveHello(pkt); // neighbor_table deduplicates by node_id
   }
   else if (type == 1 && len >= (int)sizeof(NodePacket))
   {
-    NodePacket pkt;
-    memcpy(&pkt, data, sizeof(NodePacket));
-    node->receivePacket(pkt, now);
+    // NodePackets only meaningful in OPERATIONAL phase
+    // During HELLO phase we don't have costs yet — ignore
+    if (bootPhase == BootPhase::OPERATIONAL)
+    {
+      NodePacket pkt;
+      memcpy(&pkt, data, sizeof(NodePacket));
+      node->receivePacket(pkt, now);
+    }
   }
 }
 
@@ -160,9 +177,8 @@ void setup()
   // Comms
   espnowInit(onPacketReceived);
 
-  // Announce
-  HelloPacket hello = node->buildHello();
-  espnowSendHello((uint8_t *)&hello, sizeof(HelloPacket));
+  helloPhaseStart = millis();
+  bootPhase = BootPhase::HELLO;
 
   Serial.println("Hecate node ready.");
 }
@@ -176,6 +192,37 @@ void loop()
   static uint32_t lastTick = 0;
   float dt = (now - lastTick) / 1000.0f;
   lastTick = now;
+
+  // ── HELLO phase ───────────────────────────────────────────────────────────
+  if (bootPhase == BootPhase::HELLO)
+  {
+    // Broadcast HELLO every 500ms so all neighbors hear us
+    // even if they booted after us
+    if (now - lastHelloBroadcast > HELLO_BROADCAST_INTERVAL_MS)
+    {
+      HelloPacket hello = node->buildHello();
+      espnowSendHello((uint8_t *)&hello, sizeof(HelloPacket));
+      lastHelloBroadcast = now;
+
+      Serial.printf("[N%d] HELLO phase — %lu ms remaining\n", node->node_id, HELLO_PHASE_DURATION_MS - (now - helloPhaseStart));
+    }
+
+    // Still run LED and OLED so node isn't visually dead during boot
+    ledsUpdate(node->mood, node->sos_active);
+    oledUpdate(*node); // will show STBY, 0 neighbors, no cost — that's fine
+
+    // Phase transition check
+    if (now - helloPhaseStart >= HELLO_PHASE_DURATION_MS)
+    {
+      bootPhase = BootPhase::OPERATIONAL;
+      node->last_broadcast = millis(); // reset so first OP broadcast isn't immediate
+      Serial.printf("[N%d] HELLO phase done — %d neighbor(s) found. Entering OPERATIONAL.\n", node->node_id, node->neighbors.count);
+    }
+
+    return; // don't run operational logic during HELLO phase
+  }
+
+  // ── OPERATIONAL phase ─────────────────────────────────────────────────────
 
   // ── 0. Buttons ────────────────────────────────────────────────────────────
   checkAliveToggle(now);

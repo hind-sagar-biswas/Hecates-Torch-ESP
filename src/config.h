@@ -7,6 +7,14 @@
 #define NODE_X 2.0f
 #define NODE_Y 3.0f
 
+// ─── Boot phase timing ────────────────────────────────────────────────────────
+#define HELLO_PHASE_DEMO_MS 30000       // 30s for demo
+#define HELLO_PHASE_PROD_MS 300000      // 5min for production
+#define HELLO_BROADCAST_INTERVAL_MS 500 // broadcast HELLO every 500ms during phase
+
+// Which one to use — comment/uncomment for deployment
+#define HELLO_PHASE_DURATION_MS HELLO_PHASE_DEMO_MS
+
 // ─── Pin Definitions ──────────────────────────────────────────────────────────
 
 // LD2410C Radar (UART2)
