@@ -48,7 +48,7 @@
 #define BETA_SMOKE 0.6f // mq2 weight in H_air (higher — immediate visibility)
 #define ETA_TOX 0.4f    // mq135 weight in H_air (lower — longer-term risk)
 
-#define D_MIN 0.05f  // meters — blocked if forward < this
+#define D_MIN 0.5f  // meters — blocked if forward < this
 #define D_SAFE 0.3f // meters — hole if ground > this
 
 #define MQ2_MAX 4095.0f

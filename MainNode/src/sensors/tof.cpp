@@ -21,10 +21,12 @@ void tofInit()
     if (!sensor.init())
     {
         // Sensor not found — mark as failed, tofForwardBlocked() returns true
+        Serial.println("VL53L1X not found — ToF sensor will be disabled.");
         _initialized = false;
         return;
     }
 
+    Serial.println("VL53L1X ToF sensor initialized.");
     _initialized = true;
     sensor.setDistanceMode(VL53L1X::Long);    // up to ~4m, suits corridors
     sensor.setMeasurementTimingBudget(50000); // 50ms — fast enough for 100ms tick
@@ -48,6 +50,8 @@ float tofGetDistance()
 bool tofForwardBlocked()
 {
     float d = tofGetDistance();
+    // Serial.printf("ToF distance: %.2fm, min: %.2fm\n", d, D_MIN);
+
     if (d < 0.0f)
         return true; // no reading = treat as blocked
     return d < D_MIN;

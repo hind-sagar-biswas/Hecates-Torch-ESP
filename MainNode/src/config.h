@@ -3,12 +3,12 @@
 // ─── Node Identity ────────────────────────────────────────────────────────────
 #define NODE_ID 2
 #define FLOOR_ID 0
-#define IS_EXIT true
+#define IS_EXIT false
 #define NODE_X 2.0f
 #define NODE_Y 3.0f
 
 // ─── Boot phase timing ────────────────────────────────────────────────────────
-#define HELLO_PHASE_DEMO_MS 3000       // 30s for demo
+#define HELLO_PHASE_DEMO_MS 60000       // 60s for demo
 #define HELLO_PHASE_PROD_MS 300000      // 5min for production
 #define HELLO_BROADCAST_INTERVAL_MS 500 // broadcast HELLO every 500ms during phase
 

@@ -164,10 +164,15 @@ void setup()
   node = new NodeState(NODE_ID, FLOOR_ID, NODE_X, NODE_Y, is_exit);
 
   // Sensors — MQ blocks ~30s here
+  Serial.println("Initializing sensor: MQ");
   mqInit();
+  Serial.println("Initializing sensor: Flame");
   flameInit();
+  Serial.println("Initializing sensor: ToF");
   tofInit();
+  Serial.println("Initializing sensor: Radar");
   radarInit(RADAR_RX_PIN, RADAR_TX_PIN);
+  Serial.println("Initializing sensor: Temperature");
   tempInit(TEMP_PIN);
 
   // FIX: LEDs init after buttons — ledsInit() only touches LED pins
@@ -249,7 +254,22 @@ void loop()
   node->sensors.flame_norm = flameGetNorm();
 
   // Hardware blocked OR button blocked
+  // Serial.printf("[N%d] Sensors — P:%.2f F:%.2f S:%.2f A:%.2f H:%.2f ΔT:%.2f\n",
+  //               node->node_id,
+  //               node->sensors.pressure_norm,
+  //               node->sensors.flame_norm,
+  //               node->sensors.smoke_norm,
+  //               node->sensors.air_norm,
+  //               node->sensors.heat_norm,
+  //               node->sensors.delta_temp_norm);
+
   node->sensors.blocked = btnBlocked || flameGetDigital() || tofForwardBlocked();
+  // Serial.printf("[N%d] Blocked status: %d (btn=%d flame=%d tof=%d)\n",
+                // node->node_id,
+                // node->sensors.blocked,
+                // btnBlocked,
+                // flameGetDigital(),
+                // tofForwardBlocked());
 
   // ── 2. Algorithm tick ─────────────────────────────────────────────────────
   node->updateDerivedSensors();
