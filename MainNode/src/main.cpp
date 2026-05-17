@@ -263,7 +263,8 @@ void loop()
   //               node->sensors.heat_norm,
   //               node->sensors.delta_temp_norm);
 
-  node->sensors.blocked = btnBlocked || flameGetDigital() || tofForwardBlocked();
+  bool confidentlyDebris = tofForwardBlocked() && (node->sensors.still_norm < 0.15f) && (node->sensors.pressure_norm < 0.15f);
+  node->sensors.blocked = btnBlocked || flameGetDigital() || confidentlyDebris;
   // Serial.printf("[N%d] Blocked status: %d (btn=%d flame=%d tof=%d)\n",
                 // node->node_id,
                 // node->sensors.blocked,
