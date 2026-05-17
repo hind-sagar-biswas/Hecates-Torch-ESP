@@ -215,6 +215,7 @@ NodePacket NodeState::buildPacket(uint32_t now)
     pkt.sos_origin_id = sos_active ? node_id : 0;
     pkt.timestamp = now;
     pkt.type = 1;
+    pkt.version = PACKET_VERSION;
     return pkt;
 }
 
@@ -240,6 +241,7 @@ HelloPacket NodeState::buildHello()
     pkt.x = x;
     pkt.y = y;
     pkt.type = 0;
+    pkt.version = PACKET_VERSION;
     return pkt;
 }
 

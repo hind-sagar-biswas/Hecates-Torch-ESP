@@ -1,7 +1,7 @@
 #pragma once
 
 // ─── Node Identity ────────────────────────────────────────────────────────────
-#define NODE_ID 1
+#define NODE_ID 2
 #define FLOOR_ID 0
 #define IS_EXIT true
 #define NODE_X 2.0f
